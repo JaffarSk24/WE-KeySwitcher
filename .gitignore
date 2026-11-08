@@ -1,0 +1,8 @@
+.build
+.build.nosync/
+data-raw
+data-raw.nosync/
+build
+build.nosync/
+*.p12
+.DS_Store

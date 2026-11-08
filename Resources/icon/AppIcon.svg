@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A5679"/>
+      <stop offset="1" stop-color="#343E5E"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E3E9F7"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="210" y="236" width="604" height="560" rx="96" fill="#1F2640" opacity="0.5"/>
+  <rect x="210" y="210" width="604" height="560" rx="96" fill="url(#cap)"/>
+  <text x="372" y="600" font-family="Helvetica Neue" font-weight="700" font-size="270" fill="#374161" text-anchor="middle">A</text>
+  <text x="652" y="600" font-family="Helvetica Neue" font-weight="700" font-size="270" fill="#F97316" text-anchor="middle">Я</text>
+  <path d="M330 660 Q512 745 694 660" fill="none" stroke="#F97316" stroke-width="30" stroke-linecap="round"/>
+  <path d="M694 660 l-62 -6 m62 6 l-24 56" fill="none" stroke="#F97316" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M694 330 Q512 245 330 330" fill="none" stroke="#374161" stroke-width="30" stroke-linecap="round"/>
+  <path d="M330 330 l62 6 m-62 -6 l24 -56" fill="none" stroke="#374161" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
