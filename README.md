@@ -20,6 +20,7 @@ It is made for Macs with Apple M-series chips only (there is no Intel build), is
 - **Menu bar indicator** of the current layout (RU, EN, SK, ...) with the settings menu, and an optional soft sound on every automatic switch.
 - **Starts at login** (a standard login item that can be turned off in the menu).
 - **PuntoSwitcher rules import.** On the first start the app imports the user rules of PuntoSwitcher, if it was installed, as remembered words.
+- **Updates itself.** Once a day the app asks GitHub Releases whether there is a new version. If there is, it shows what is new and, when you agree, downloads it, checks that it is signed with the same certificate, replaces itself in place and restarts. Settings, remembered words, the login item and the macOS permissions stay. The check can be turned off in the menu, and Check for Updates runs it by hand.
 - **Interface** in English, Russian and Slovak.
 
 ## How it decides
@@ -58,6 +59,7 @@ Most of the remaining misses are rare words that are rare in both readings, and 
 1. Download `WE-KeySwitcher-<version>.zip` from [Releases](https://github.com/JaffarSk24/WE-KeySwitcher/releases), unzip it and move **WE KeySwitcher.app** to the Applications folder.
 2. The app is not notarized by Apple, so the first start needs one confirmation: open it, then go to System Settings > Privacy & Security and press **Open Anyway** (or Control-click the app and choose Open).
 3. Give it two permissions in System Settings > Privacy & Security: **Accessibility** and **Input Monitoring** (switch on WE KeySwitcher in both lists). The app picks the permissions up by itself within a couple of seconds; until then its menu bar title ends with `!` and the menu says what is missing.
+4. Later versions install themselves: the app offers each new release and updates in place (from version 1.2.0 on; earlier versions are updated once by hand).
 
 ## Usage
 
@@ -69,7 +71,7 @@ Most of the remaining misses are rare words that are rare in both readings, and 
 | Select text, Option | Converts the selection and switches the layout |
 | Option+Shift | Inverts case of the last word or of the selection |
 
-The menu bar menu has the switches for automatic switching (and for switching already while typing), the sound and the two capitals fix, the list of remembered words, the excluded apps (add the app you were in, or choose any app), and Open at login.
+The menu bar menu has the switches for automatic switching (and for switching already while typing), the sound and the two capitals fix, the list of remembered words, the excluded apps (add the app you were in, or choose any app), Open at login, Check for Updates and the automatic update check.
 
 ## Data and settings
 
@@ -77,7 +79,7 @@ The menu bar menu has the switches for automatic switching (and for switching al
 - Remembered words and undo counters: `~/Library/Application Support/WE KeySwitcher/learned.json`.
 - Debug log (off by default, it records the words you type): `defaults write sk.whiteeagles.keyswitcher debugLog -bool true`, written to `~/Library/Logs/WE KeySwitcher.log`.
 
-The app makes no network connections and sends nothing anywhere.
+The only network request the app makes is the update check: once a day it reads the latest release from the GitHub API (`api.github.com/repos/JaffarSk24/WE-KeySwitcher/releases/latest`) and, if you accept an update, downloads it from GitHub. Nothing you type is sent anywhere. The check can be switched off in the menu.
 
 ## Building from source
 

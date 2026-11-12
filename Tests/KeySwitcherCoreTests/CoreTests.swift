@@ -68,6 +68,14 @@ enum Fixture {
         #expect(!TextTools.hasDomainSuffix("k.,k."))
     }
 
+    @Test func versions() {
+        #expect(Versions.isNewer("1.2.0", than: "1.1.0"))
+        #expect(Versions.isNewer("1.10.0", than: "1.9.9"))
+        #expect(Versions.isNewer("1.2", than: "1.1.9"))
+        #expect(!Versions.isNewer("1.2.0", than: "1.2"))
+        #expect(!Versions.isNewer("1.1.0", than: "1.2.0"))
+    }
+
     @Test func direction() {
         #expect(TextTools.direction(of: "привет мир", lastLatin: .sk) == (.ru, .sk))
         #expect(TextTools.direction(of: "hello", lastLatin: .us) == (.us, .ru))

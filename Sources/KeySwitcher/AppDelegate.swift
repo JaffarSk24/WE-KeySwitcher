@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
         tryStart()
+        Updater.shared.start()
         if !(monitor?.isRunning ?? false) {
             retryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tryStart() }
@@ -134,9 +135,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(ex)
         menu.addItem(.separator())
         menu.addItem(toggle(L("Open at login"), SMAppService.mainApp.status == .enabled, #selector(toggleLogin)))
+        if let status = Updater.shared.status {
+            menu.addItem(disabled(status))
+        } else {
+            menu.addItem(item(L("Check for Updates…"), #selector(checkUpdates)))
+        }
+        menu.addItem(toggle(L("Check for updates automatically"), s.autoCheckUpdates, #selector(toggleAutoUpdates)))
         menu.addItem(disabled(L("Option: convert the word or the selection")))
         menu.addItem(disabled(L("Option+Shift: invert case")))
         menu.addItem(.separator())
+        menu.addItem(disabled("WE KeySwitcher " + Updater.currentVersion))
         menu.addItem(item(L("Quit"), #selector(quit)))
     }
 
@@ -164,6 +172,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleAuto() { Settings.shared.autoSwitch.toggle() }
+    @objc private func checkUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
+    @objc private func toggleAutoUpdates() {
+        Settings.shared.autoCheckUpdates.toggle()
+        Updater.shared.start()
+    }
     @objc private func toggleWhileTyping() { Settings.shared.switchWhileTyping.toggle() }
     @objc private func toggleSound() { Settings.shared.sound.toggle() }
     @objc private func toggleCaps() { Settings.shared.fixTwoCapitals.toggle() }

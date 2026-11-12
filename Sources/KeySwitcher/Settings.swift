@@ -10,6 +10,7 @@ final class Settings {
         d.register(defaults: [
             "autoSwitch": true,
             "switchWhileTyping": true,
+            "autoCheckUpdates": true,
             "sound": true,
             "fixTwoCapitals": true,
             "excludedApps": ["com.microsoft.VSCode"],
@@ -26,6 +27,18 @@ final class Settings {
     var switchWhileTyping: Bool {
         get { d.bool(forKey: "switchWhileTyping") }
         set { d.set(newValue, forKey: "switchWhileTyping") }
+    }
+
+    /// Daily check of GitHub Releases for a new version.
+    var autoCheckUpdates: Bool {
+        get { d.bool(forKey: "autoCheckUpdates") }
+        set { d.set(newValue, forKey: "autoCheckUpdates") }
+    }
+
+    /// A version the user chose to skip in the update offer.
+    var skippedVersion: String? {
+        get { d.string(forKey: "skippedVersion") }
+        set { d.set(newValue, forKey: "skippedVersion") }
     }
 
     var sound: Bool {
