@@ -93,9 +93,10 @@ public final class NgramModel: @unchecked Sendable {
         return p
     }
 
-    /// log10 P(word) including the end-of-word marker.
-    public func logProb(_ word: String) -> Double {
-        let padded = String(repeating: "^", count: Self.order - 1) + word + "$"
+    /// log10 P(word) including the end-of-word marker; without it (`end:
+    /// false`) the probability of the word as the start of a longer one.
+    public func logProb(_ word: String, end: Bool = true) -> Double {
+        let padded = String(repeating: "^", count: Self.order - 1) + word + (end ? "$" : "")
         let chars = Array(padded)
         var lp = 0.0
         for i in (Self.order - 1)..<chars.count {
@@ -107,8 +108,8 @@ public final class NgramModel: @unchecked Sendable {
 
     /// Lowest single-character log10 probability within the word: catches
     /// letter combinations a language practically never has.
-    public func worstStep(_ word: String) -> Double {
-        let padded = String(repeating: "^", count: Self.order - 1) + word + "$"
+    public func worstStep(_ word: String, end: Bool = true) -> Double {
+        let padded = String(repeating: "^", count: Self.order - 1) + word + (end ? "$" : "")
         let chars = Array(padded)
         var worst = 0.0
         for i in (Self.order - 1)..<chars.count {

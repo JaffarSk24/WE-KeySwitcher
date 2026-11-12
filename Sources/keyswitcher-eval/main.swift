@@ -53,6 +53,84 @@ if let wArg = args.first(where: { $0.hasPrefix("--word=") }) {
     exit(0)
 }
 
+// --prefix: simulates switching while a word is still being typed. After each
+// letter from the 3rd on, the prefix typed so far is compared with the same
+// keys in the other layout by the n-gram models only (a prefix is rarely a
+// dictionary word). A switch fires when the other reading is ahead by the
+// margin and the typed reading contains an improbable letter transition.
+if args.contains("--prefix") {
+    func lp(_ text: String, latin: Bool) -> (Double, Double) {
+        var best = -Double.infinity, worst = -Double.infinity
+        for m in models.models(latin: latin) {
+            let w = m.normalize(text)
+            guard w.allSatisfy(\.isLetter) else { return (-99, -99) }
+            best = max(best, log10(config.prior[m.language] ?? 0.1) + m.ngrams.logProb(w, end: false))
+            worst = max(worst, m.ngrams.worstStep(w, end: false))
+        }
+        return (best, worst)
+    }
+    func strip(_ s: String) -> String {
+        String(s.decomposedStringWithCanonicalMapping.unicodeScalars.filter { !(0x0300...0x036F).contains($0.value) }.map(Character.init))
+    }
+    func load(_ f: String) -> [String] {
+        ((try? String(contentsOf: testDir.appendingPathComponent(f), encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+    }
+    struct C { let word: String; let intended: LayoutKind; let typedIn: LayoutKind; let latin: LayoutKind }
+    var cases: [C] = []
+    for set in ["manual", "freq", "mid", "rare"] {
+        let ru = load(set == "manual" ? "manual_ru.txt" : "ru_\(set).txt")
+        let en = load(set == "manual" ? "manual_en.txt" : "en_\(set).txt")
+        let sk = load(set == "manual" ? "manual_sk.txt" : "sk_\(set).txt")
+        for w in ru { cases += [C(word: w, intended: .ru, typedIn: .ru, latin: .us), C(word: w, intended: .ru, typedIn: .us, latin: .us)] }
+        for w in en { cases += [C(word: w, intended: .us, typedIn: .us, latin: .us), C(word: w, intended: .us, typedIn: .ru, latin: .us)] }
+        for w in sk { cases += [C(word: w, intended: .sk, typedIn: .sk, latin: .sk), C(word: strip(w), intended: .us, typedIn: .us, latin: .us),
+                                C(word: w, intended: .sk, typedIn: .ru, latin: .sk)] }
+    }
+    for w in load("webster_en.txt") + load("names_en.txt") {
+        cases += [C(word: w, intended: .us, typedIn: .us, latin: .us), C(word: w, intended: .us, typedIn: .ru, latin: .us)]
+    }
+    print("margin minLetters implausible | keep cases: wrong mid-word switch | switch cases: switched early, avg letters saved, long words (6+) switched early")
+    for minLetters in [3, 4, 5] {
+        for margin in [3.0, 4.0, 5.0, 6.0] {
+            for implausible in [-2.5, -3.0, -3.5] {
+                var keepN = 0, keepBad = 0, swN = 0, swEarly = 0, saved = 0, longN = 0, longEarly = 0
+                var badSamples: [String] = []
+                for c in cases {
+                    guard let st = layouts[c.intended].strokes(for: c.word), c.word.filter(\.isLetter).count >= 2 else { continue }
+                    let shouldSwitch = c.intended.isLatin != c.typedIn.isLatin
+                    let alt: LayoutKind = c.typedIn == .ru ? c.latin : .ru
+                    var firedAt: Int? = nil
+                    if st.count > minLetters {
+                        for k in minLetters..<st.count {
+                            let pre = Array(st.prefix(k))
+                            let t = layouts[c.typedIn].translate(pre), o = layouts[alt].translate(pre)
+                            let (sT, wT) = lp(t, latin: c.typedIn.isLatin)
+                            let (sO, _) = lp(o, latin: alt.isLatin)
+                            guard sO > -99 else { break }
+                            let need = margin + (c.typedIn == .ru ? 1.0 : 0)
+                            if sO - sT > need && wT < implausible { firedAt = k; break }
+                        }
+                    }
+                    if shouldSwitch {
+                        swN += 1
+                        if let f = firedAt { swEarly += 1; saved += st.count - f }
+                        if st.count >= 6 { longN += 1; if firedAt != nil { longEarly += 1 } }
+                    } else {
+                        keepN += 1
+                        if let f = firedAt { keepBad += 1; if badSamples.count < 6 { badSamples.append("\(c.word)@\(f)") } }
+                    }
+                }
+                print(String(format: "%.1f %d %.1f | %d of %d (%.2f%%) %@ | %.1f%% early, %.1f letters saved, long %.1f%%",
+                             margin, minLetters, implausible, keepBad, keepN, 100.0 * Double(keepBad) / Double(keepN),
+                             badSamples.joined(separator: ",") as NSString,
+                             100.0 * Double(swEarly) / Double(swN), Double(saved) / Double(max(swEarly, 1)),
+                             100.0 * Double(longEarly) / Double(max(longN, 1))))
+            }
+        }
+    }
+    exit(0)
+}
+
 struct Case {
     let word: String
     let intended: LayoutKind

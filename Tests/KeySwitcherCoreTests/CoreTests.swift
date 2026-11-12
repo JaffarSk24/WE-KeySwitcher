@@ -135,6 +135,36 @@ enum Fixture {
         }
     }
 
+    func context(_ word: String, intended: LayoutKind, typedIn: LayoutKind, target: LayoutKind) -> String? {
+        let strokes = Fixture.layouts[intended].strokes(for: word)!
+        return Fixture.classifier.followsSwitch(strokes: strokes, typed: Fixture.layouts[typedIn].translate(strokes),
+                                                current: typedIn, target: target)
+    }
+
+    @Test(arguments: ["в", "с", "к", "у", "о", "и", "а", "я", "да", "на", "не", "ну", "мы", "по", "за", "из", "от", "до", "В", "Я"])
+    func shortRussianWordBeforeSwitchedWordFollows(_ word: String) {
+        #expect(context(word, intended: .ru, typedIn: .us, target: .ru) == word)
+        #expect(context(word, intended: .ru, typedIn: .sk, target: .ru) == word)
+    }
+
+    @Test func shortEnglishWordBeforeSwitchedWordFollows() {
+        #expect(context("I", intended: .us, typedIn: .ru, target: .us) == "I")
+        #expect(context("a", intended: .us, typedIn: .ru, target: .us) == "a")
+        #expect(context("to", intended: .us, typedIn: .ru, target: .us) == "to")
+    }
+
+    @Test func shortWordsThatStayBeforeSwitchedWord() {
+        // Real words in the typed language that are rare as converted.
+        #expect(context("a", intended: .us, typedIn: .us, target: .ru) == nil)   // ф
+        #expect(context("I", intended: .us, typedIn: .us, target: .ru) == nil)   // Ш
+        #expect(context("ok", intended: .us, typedIn: .us, target: .ru) == nil)  // щл
+        #expect(context("он", intended: .ru, typedIn: .ru, target: .us) == nil)  // jy
+        // Longer words and abbreviations are never pulled along.
+        #expect(context("PROD", intended: .us, typedIn: .us, target: .ru) == nil)
+        #expect(context("git", intended: .us, typedIn: .us, target: .ru) == nil)
+        #expect(context("x2", intended: .us, typedIn: .us, target: .ru) == nil)
+    }
+
     /// Accuracy on the word lists in Tests/data (the same lists keyswitcher-eval uses).
     @Test func accuracyOnWordLists() throws {
         func load(_ f: String) -> [String] {

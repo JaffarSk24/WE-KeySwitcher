@@ -242,6 +242,20 @@ select(.us); type("ghbdtn rfr ltkf ", as: .us)
 check("sentence", "привет как дела ", layout: .ru)
 clear()
 
+// 16b. A one-letter word left after an English word goes with the next
+// switched word: "PROD d ,kb;fqibt" is "PROD в ближайшие".
+select(.us); type("PROD d ,kb;fqibt ", as: .us)
+check("short word follows the switched word", "PROD в ближайшие ", layout: .ru)
+option()
+check("undo takes the short word back too", "PROD d ,kb;fqibt ", layout: .us)
+clear()
+select(.us); type("a ghbdtn ", as: .us)
+check("English a stays before a Russian word", "a привет ", layout: .ru)
+clear()
+select(.ru); type("ш ырщгдв ", as: .ru)
+check("short word follows to English", "i should ", layout: .us)
+clear()
+
 // 17. Option while a menu is open does nothing (Finder's "Copy as Pathname"
 // and other alternate menu items rely on Option).
 func pressMenuBarItem(_ title: String) {

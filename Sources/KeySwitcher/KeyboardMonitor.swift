@@ -8,6 +8,8 @@ struct TypedItem {
     var text: String
     var isWord: Bool
     var layout: LayoutKind
+    /// Already converted (automatically or by hand): never touched by context.
+    var settled = false
 }
 
 enum LastAction {
@@ -227,12 +229,44 @@ final class KeyboardMonitor {
             let s = layouts[target].character(for: separator)
             if !s.isEmpty { sepOut = s }
         }
-        Typist.post(Typist.replacementEvents(deleting: typedCount, typing: replacement + sepOut), proxy: proxy)
+        // Short words left as typed right before a switched word go with it.
+        var start = range.lowerBound
+        var contextWords: [Range<Int>] = []
+        if let target {
+            for prev in wordRanges().reversed() where prev.upperBound < range.lowerBound {
+                guard contextWords.count < 2,
+                      items[prev.upperBound..<start].allSatisfy({ !$0.isWord && $0.text == " " }),
+                      items[prev].allSatisfy({ $0.layout == wordLayout && !$0.settled }),
+                      classifier.followsSwitch(strokes: items[prev].map(\.stroke),
+                                               typed: layouts[wordLayout].translate(items[prev].map(\.stroke)),
+                                               current: wordLayout, target: target, remembered: learned.matchSet) != nil
+                else { break }
+                contextWords.append(prev)
+                start = prev.lowerBound
+            }
+        }
+        var deleteCount = typedCount
+        var prefix = ""
+        if start < range.lowerBound {
+            for i in start..<range.lowerBound {
+                deleteCount += items[i].text.count
+                if items[i].isWord, let t = target {
+                    let r = layouts[t].character(for: items[i].stroke)
+                    items[i].text = r
+                    items[i].layout = t
+                    items[i].settled = true
+                }
+                prefix += items[i].text
+            }
+            DebugLog.write("context: '\(prefix)' follows the switched word")
+        }
+        Typist.post(Typist.replacementEvents(deleting: deleteCount, typing: prefix + replacement + sepOut), proxy: proxy)
 
         // Keep the history in step with what is on screen now.
         let newLayout = target ?? wordLayout
         for i in range {
             items[i].layout = newLayout
+            items[i].settled = true
             if target != nil { items[i].text = layouts[newLayout].character(for: items[i].stroke) }
         }
         if fixedCase, range.count > 1 {
@@ -244,7 +278,7 @@ final class KeyboardMonitor {
         items.append(TypedItem(stroke: separator, text: sepOut, isWord: false, layout: newLayout))
         if let target {
             switchLayout(to: target)
-            lastAction = .autoSwitch(original: TextTools.trimNonLetters(typed), start: range.lowerBound)
+            lastAction = .autoSwitch(original: TextTools.trimNonLetters(typed), start: start)
             if settings.sound { Sound.play() }
         }
         return true
@@ -314,7 +348,13 @@ final class KeyboardMonitor {
             return
         }
         guard count <= words.count else { return }
-        let start = words[words.count - count].lowerBound
+        var start = words[words.count - count].lowerBound
+        // Undo of an automatic switch also takes back the short words that
+        // followed it.
+        if case .autoSwitch(_, let s) = previous, count == 1, s < start, s < items.count {
+            start = s
+            count = words.filter { $0.lowerBound >= s }.count
+        }
         let region = start..<items.count
         if target == nil {
             let lastWordLayout = items[words.last!.lowerBound].layout
@@ -331,6 +371,7 @@ final class KeyboardMonitor {
         for (k, i) in region.enumerated() {
             items[i].text = newTexts[k]
             items[i].layout = t
+            items[i].settled = true
         }
         if let cw = currentWordRange() { lockedFrom = cw.lowerBound }
         switchLayout(to: t)

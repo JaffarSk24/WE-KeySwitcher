@@ -18,6 +18,11 @@ public struct ClassifierConfig: Sendable {
     public var rarePerMillion: Double = 0.2
     public var marginRareOther: Double = 2.5
     public var marginNgramToLatin: Double = 4.0
+    /// A one- or two-letter word right before a word that switched follows it
+    /// when, in the new language, it is at least this common (per million)...
+    public var contextMinPerMillion: Double = 100
+    /// ...and this many times more common than the form it was typed in.
+    public var contextRatio: Double = 5
     /// Advantage required for two-letter words.
     public var marginShort: Double = 2.3
     /// A typed word this common (per million words) is never switched.
@@ -184,5 +189,28 @@ public final class Classifier: @unchecked Sendable {
             return d
         }
         return keep("margin")
+    }
+
+    /// A short word (one or two letters) that stayed as typed right before a
+    /// word which was then switched to `target`: "PROD d ,kb;fqibt" ends with
+    /// "ближайшие", so the lone "d" is the preposition "в". Short words are too
+    /// ambiguous on their own, but the next word tells which language this is.
+    /// Returns the converted word, or nil when it should stay.
+    public func followsSwitch(strokes: [KeyStroke], typed: String, current: LayoutKind, target: LayoutKind,
+                              remembered: Set<String> = []) -> String? {
+        guard current != target, layouts.has(target), current.isLatin != target.isLatin else { return nil }
+        let other = layouts[target].translate(strokes)
+        let (coreTyped, coreOther) = Self.cores(strokes.map { layouts[current].character(for: $0) },
+                                                strokes.map { layouts[target].character(for: $0) })
+        let letters = max(coreTyped.filter(\.isLetter).count, coreOther.filter(\.isLetter).count)
+        guard (1...2).contains(letters) else { return nil }
+        if remembered.contains(typed.lowercased()) || remembered.contains(TextTools.trimNonLetters(typed).lowercased()) { return nil }
+        if other.contains(where: \.isNumber) || (current.isLatin && typed.contains(where: \.isNumber)) { return nil }
+        guard TextTools.isPlainWord(coreOther) else { return nil }
+        let sO = score(coreOther, latin: target.isLatin)
+        guard sO.known, sO.perMillion >= config.contextMinPerMillion else { return nil }
+        let sT = score(coreTyped, latin: current.isLatin)
+        if TextTools.isPlainWord(coreTyped) && sT.known && sO.perMillion < sT.perMillion * config.contextRatio { return nil }
+        return other
     }
 }
