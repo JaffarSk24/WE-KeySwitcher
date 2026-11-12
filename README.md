@@ -4,7 +4,7 @@
 
 WE KeySwitcher is a small native macOS menu bar app that fixes text typed in the wrong keyboard layout. Type `ghbdtn` with the English layout on and it becomes `привет` the moment you press space, and the layout switches to Russian. Press Option once and the last word (or the selected text) is converted by hand. It works between Russian and English, and between Russian and Slovak, and it never touches what you meant to type.
 
-It is made for Macs with Apple M-series chips only (there is no Intel build), is written in Swift, works fully offline and keeps everything on your Mac. Made by [White Eagles & Co. s.r.o.](https://whiteeagles.sk/)
+It is made for Macs with Apple M-series chips only (there is no Intel build), is written in Swift and keeps everything you type on your Mac; its only network use is a daily check for updates on GitHub, which can be turned off. Made by [White Eagles & Co. s.r.o.](https://whiteeagles.sk/)
 
 ## What it does
 
