@@ -9,9 +9,10 @@ It is made for Macs with Apple M-series chips only (there is no Intel build), is
 ## What it does
 
 - **Automatic switching after a word.** When you finish a word with space or punctuation, the app checks whether the keys you pressed make more sense in the other layout. If they do, the whole word is retyped in the right layout (punctuation included: `ghbdtn^` becomes `привет,`) and the system layout is switched. It only switches between Cyrillic and Latin; it never switches between two Latin layouts on its own.
+- **Switching while typing.** When the first letters already make the language clear, the word is switched before you finish it: by the third or fourth letter of `ghbdtnbr` you already see `при...`, and the rest goes in the right layout. This also fixes the last word of a chat message sent with Return. Everything that is not clear this early waits for the end of the word. It is off in search fields, combo boxes and browser address bars, whose inline completion does not mix with retyping, and it can be turned off in the menu.
 - **Short words follow the next word.** One- and two-letter words are too ambiguous to switch on their own (`z` is the Russian `я` and also a Slovak word), so they wait for the next word. When it switches, a short word right before it goes along if it is a common word in the new language: `PROD d ,kb;fqibt` becomes `PROD в ближайшие`, while the English `a` in `a ghbdtn` stays.
 - **Single Option converts by hand.** Press and release Option (without other keys in between) and the last word is converted to the other layout. Press it again right away and one more word before it is taken, then another, and so on. With text selected, Option converts the selection. After a click somewhere in a text, Option converts the word right before the caret.
-- **Undo and learning.** Option right after an automatic switch puts the word back as typed. When you undo the switch of the same word three times, the word is remembered and is never switched again. The list of remembered words can be searched and edited from the menu.
+- **Undo and learning.** Option right after an automatic switch puts the word back as typed. This works in the middle of a word too: if a word (a name, a password in a plain field) switches while you type it, press Option and keep typing; the rest of the word stays in the layout you chose and is not switched again. When you undo the switch of the same word three times, the word is remembered and is never switched again. The list of remembered words can be searched and edited from the menu.
 - **Option+Shift inverts case** of the last word or of the selection: `пРИВЕТ` becomes `Привет`.
 - **TWo capitals fixed.** `ПРивет` and `HEllo` become `Привет` and `Hello` at the end of the word.
 - **Menus are left alone.** Option pressed while any menu is open (a Finder context menu, the menu bar, a pop-up) is ignored, so alternate menu items such as Finder's "Copy as Pathname" keep working.
@@ -29,7 +30,7 @@ Both readings of the word are then scored as language model probabilities:
 
 1. **Word frequency dictionaries** for Russian, English and Slovak (about 1.1 million, 1.5 million and 540 thousand word forms). Russian and English mix everyday speech from movie subtitles with Wikipedia, which brings names and technical words such as `github` or `kubernetes`. Slovak is also recognised without diacritics, so `dakujem` typed in the English layout stays as it is.
 2. **A character n-gram model** (order 4, Witten-Bell smoothing) for each language, used for words that are in no dictionary. It knows which letter combinations a language practically never has.
-3. **Rules** that keep things as typed: words with digits, URLs, e-mail addresses, paths, domain names, camelCase, Latin abbreviations in capitals (`USA`, `HTML`), one-letter words, remembered words. Ambiguous short words need a much larger advantage before they are switched.
+3. **Rules** that keep things as typed: words with digits, URLs, e-mail addresses, paths, domain names, camelCase, Latin abbreviations in capitals (`USA`, `HTML`) or with full stops (`s.r.o.`, `e.g.`), one-letter words, remembered words. Ambiguous short words need a much larger advantage before they are switched.
 
 Leaving Cyrillic needs more evidence than entering it, because most of the text is expected to be Russian; the priors and margins live in `ClassifierConfig`.
 
@@ -42,6 +43,8 @@ Measured by `keyswitcher-eval` on 29 132 cases: real words from the frequency li
 | Correct words switched by mistake | 13 753 | 9 (0.07%) |
 | Wrong-layout words not switched | 15 379 | 212 (1.38%) |
 | Total | 29 132 | 221 (0.76%) |
+
+Switching while typing uses a stricter rule on the letters typed so far (only the n-gram models, a margin of 5 orders of magnitude, an improbable letter combination in the typed reading, plain letters plus a comma, semicolon or bracket inside the word, never the start of a remembered word). On the same cases it adds no new mistakes: of 11 971 correct words only one (a rare misspelling that the word-end decision switches too) changed, on its last letter, and 78% of the wrong-layout words (88% of those of 6+ letters) were fixed by their last letter, on average 3.9 letters before the end. Measure it with `keyswitcher-eval . --prefix`.
 
 Most of the remaining misses are rare words that are rare in both readings, and real collisions where both readings are frequent words: `руку` and `here`, `рук` and `her`, `щас` and `ofc`, `мы` and `vs` (the last one is switched to Russian). A word switched against your will is fixed with Option once, and learned after the third time. One-letter words (`я` typed as `z`, which is also a Slovak word) are never switched automatically by design.
 
@@ -60,13 +63,13 @@ Most of the remaining misses are rare words that are rare in both readings, and 
 
 | Action | Result |
 |---|---|
-| Type a word in the wrong layout and press space | The word is retyped in the right layout, the layout switches |
+| Type a word in the wrong layout | Switched while typing once the letters are clear, otherwise at the space |
 | Option (press and release) | Converts the last word; again: one more word |
 | Option right after an automatic switch | Undoes it (three undos of a word remember it) |
 | Select text, Option | Converts the selection and switches the layout |
 | Option+Shift | Inverts case of the last word or of the selection |
 
-The menu bar menu has the switches for automatic switching, the sound and the two capitals fix, the list of remembered words, the excluded apps (add the app you were in, or choose any app), and Open at login.
+The menu bar menu has the switches for automatic switching (and for switching already while typing), the sound and the two capitals fix, the list of remembered words, the excluded apps (add the app you were in, or choose any app), and Open at login.
 
 ## Data and settings
 

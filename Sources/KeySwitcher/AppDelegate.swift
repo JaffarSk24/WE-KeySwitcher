@@ -106,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(.separator())
         }
         menu.addItem(toggle(L("Switch layout automatically"), s.autoSwitch, #selector(toggleAuto)))
+        let whileTyping = toggle(L("Already while typing a word"), s.switchWhileTyping, #selector(toggleWhileTyping))
+        whileTyping.indentationLevel = 1
+        whileTyping.isEnabled = s.autoSwitch
+        menu.addItem(whileTyping)
         menu.addItem(toggle(L("Sound on automatic switch"), s.sound, #selector(toggleSound)))
         menu.addItem(toggle(L("Fix TWo capitals"), s.fixTwoCapitals, #selector(toggleCaps)))
         menu.addItem(.separator())
@@ -160,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleAuto() { Settings.shared.autoSwitch.toggle() }
+    @objc private func toggleWhileTyping() { Settings.shared.switchWhileTyping.toggle() }
     @objc private func toggleSound() { Settings.shared.sound.toggle() }
     @objc private func toggleCaps() { Settings.shared.fixTwoCapitals.toggle() }
 

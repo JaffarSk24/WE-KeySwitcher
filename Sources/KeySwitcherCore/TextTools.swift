@@ -26,6 +26,12 @@ public enum TextTools {
         return true
     }
 
+    /// Single letters with full stops between them: "s.r.o", "e.g", "U.S.A".
+    public static func isDottedAbbreviation(_ s: String) -> Bool {
+        let parts = s.split(separator: ".", omittingEmptySubsequences: false)
+        return parts.count >= 2 && parts.allSatisfy { $0.count == 1 && $0.first!.isLetter }
+    }
+
     public static func isCamelCase(_ s: String) -> Bool {
         var prevLower = false
         for ch in s {

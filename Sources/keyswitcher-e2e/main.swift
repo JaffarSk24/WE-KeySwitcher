@@ -36,14 +36,15 @@ func select(_ k: LayoutKind) {
 
 let src = CGEventSource(stateID: .hidSystemState)
 
+var keyGap = 18
 func key(_ code: UInt16, flags: CGEventFlags = []) {
     for down in [true, false] {
         let e = CGEvent(keyboardEventSource: src, virtualKey: code, keyDown: down)!
         e.flags = flags
         e.post(tap: .cghidEventTap)
-        pause(12)
+        pause(keyGap < 12 ? keyGap : 12)
     }
-    pause(18)
+    pause(keyGap)
 }
 
 func modifierTap(_ codes: [UInt16], _ flags: [CGEventFlags]) {
@@ -125,6 +126,7 @@ func defaultsWrite(_ key: String, _ on: Bool) {
     try? p.run(); p.waitUntilExit()
     pause(1200)
 }
+func setAuto(_ on: Bool) { defaultsWrite("autoSwitch", on) }
 // Undo tests below must not teach the app anything.
 defaultsWrite("learnFromUndo", false)
 
@@ -175,12 +177,14 @@ select(.us); type("привет, ", as: .ru)
 check("ru with comma", "привет, ", layout: .ru)
 clear()
 
-// 7. Option converts the last word typed so far.
+// 7. Option converts the last word typed so far (manual conversion only).
+setAuto(false)
 select(.us); type("слово", as: .ru); option()
 check("Option on word", "слово", layout: .ru)
 type(" ", as: .ru)
 check("no auto switch after manual", "слово ", layout: .ru)
 clear()
+setAuto(true)
 
 // 8. Option right after an automatic switch undoes it.
 select(.us); type("ghbdtn ", as: .us)
@@ -190,7 +194,6 @@ check("undo auto", "ghbdtn ", layout: .us)
 clear()
 
 // 9. Repeated Option takes one more word each time (automatic switching off).
-func setAuto(_ on: Bool) { defaultsWrite("autoSwitch", on) }
 setAuto(false)
 select(.us); type("ghbdtn vbh", as: .us)
 check("auto off keeps text", "ghbdtn vbh", layout: .us)
@@ -221,15 +224,17 @@ check("selection converted", "руддщ цщкдв", layout: .ru)
 key(UInt16(kVK_RightArrow)); clear()
 
 // 13. Option alone after clicking away: word before the caret.
+setAuto(false)
 select(.us); type("ghbdtn", as: .us)
 key(UInt16(kVK_LeftArrow)); key(UInt16(kVK_RightArrow)) // buffer reset, caret stays
 option()
 check("word before caret", "привет", layout: .ru)
 clear()
+setAuto(true)
 
 // 14. Words and abbreviations that must stay as typed.
-select(.us); type("USA HTML git npm docker www.google.com user@mail.sk ", as: .us)
-check("latin specials stay", "USA HTML git npm docker www.google.com user@mail.sk ", layout: .us)
+select(.us); type("USA HTML git npm docker www.google.com user@mail.sk s.r.o. a.s. e.g. ", as: .us)
+check("latin specials stay", "USA HTML git npm docker www.google.com user@mail.sk s.r.o. a.s. e.g. ", layout: .us)
 clear()
 
 // 15. A remembered word (imported from Punto) stays.
@@ -255,6 +260,63 @@ clear()
 select(.ru); type("ш ырщгдв ", as: .ru)
 check("short word follows to English", "i should ", layout: .us)
 clear()
+
+// 16c. Switching while a word is typed: no space needed.
+select(.us); type("ghbdt", as: .us)
+check("while typing: prefix switched", "приве", layout: .ru)
+type("тик", as: .ru)
+check("while typing: rest in the new layout", "приветик", layout: .ru)
+clear()
+select(.ru); type("руддщ", as: .ru)
+check("while typing: English in RU", "hello", layout: .us)
+clear()
+// The last word before Return (sending a message in a chat) is right.
+select(.us); type("ghbdtnbr", as: .us); key(UInt16(kVK_Return))
+check("while typing: word before Return", "приветик\n", layout: .ru)
+clear()
+// Option before the separator undoes the switch.
+select(.us); type("ghbdtnbr", as: .us); option()
+check("while typing: undo before space", "ghbdtnbr", layout: .us)
+type(" ", as: .us)
+check("while typing: no new switch after undo", "ghbdtnbr ", layout: .us)
+clear()
+// Option in the middle of the word: the rest of it stays as typed
+// (a password or a name typed on purpose in the other layout).
+select(.us); type("ghbdt", as: .us)
+check("while typing: switched mid-word", "приве", layout: .ru)
+option()
+check("while typing: Option mid-word", "ghbdt", layout: .us)
+type("nbr", as: .us)
+check("while typing: rest stays after Option", "ghbdtnbr", layout: .us)
+type(" ", as: .us)
+check("while typing: and stays at the space", "ghbdtnbr ", layout: .us)
+clear()
+// Option right after the separator undoes it too.
+select(.us); type("ghbdtnbr ", as: .us)
+check("while typing: switched word and space", "приветик ", layout: .ru)
+option()
+check("while typing: undo after space", "ghbdtnbr ", layout: .us)
+clear()
+// A short word before goes along.
+select(.us); type("d ghbdtnbr ", as: .us)
+check("while typing: short word follows", "в приветик ", layout: .ru)
+clear()
+// Words that must stay.
+select(.us); type("kubernetes github dakujem objednavka localhost ", as: .us)
+check("while typing: latin words stay", "kubernetes github dakujem objednavka localhost ", layout: .us)
+clear()
+select(.ru); type("шипящее компьютер договорились ", as: .ru)
+check("while typing: Russian words stay", "шипящее компьютер договорились ", layout: .ru)
+clear()
+// Fast typing: 6 ms between keys.
+keyGap = 6
+select(.us); type("ghbdtn rfr ltkf ckjdj ", as: .us)
+check("fast typing", "привет как дела слово ", layout: .ru)
+clear()
+select(.ru); type("руддщ цщкдв ", as: .ru)
+check("fast typing to English", "hello world ", layout: .us)
+clear()
+keyGap = 18
 
 // 17. Option while a menu is open does nothing (Finder's "Copy as Pathname"
 // and other alternate menu items rely on Option).

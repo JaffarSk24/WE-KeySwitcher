@@ -18,6 +18,17 @@ public struct ClassifierConfig: Sendable {
     public var rarePerMillion: Double = 0.2
     public var marginRareOther: Double = 2.5
     public var marginNgramToLatin: Double = 4.0
+    /// Switching while a word is still being typed: earliest letter...
+    public var prefixMinLetters: Int = 3
+    /// ...required advantage (log10) of the other reading of the prefix...
+    public var prefixMargin: Double = 5.0
+    /// ...plus this when leaving Cyrillic...
+    public var prefixMarginToLatinExtra: Double = 1.0
+    /// ...and the typed prefix must contain a transition at least this improbable.
+    public var prefixImplausibleStep: Double = -2.5
+    /// With such a key inside (see `decidePrefix`) the other reading must have
+    /// no transition less probable than this.
+    public var prefixInnerPlausibleStep: Double = -2.5
     /// A one- or two-letter word right before a word that switched follows it
     /// when, in the new language, it is at least this common (per million)...
     public var contextMinPerMillion: Double = 100
@@ -103,6 +114,7 @@ public final class Classifier: @unchecked Sendable {
         return best
     }
 
+    static let innerKeys: Set<Character> = [",", ";", "[", "]"]
     static let sentencePunctuation: Set<Character> = Set(".,;:!?\"'»)…”’")
 
     /// Leading strokes that are not letters in either layout are dropped;
@@ -165,6 +177,12 @@ public final class Classifier: @unchecked Sendable {
             }
         }
         let keepPM = letters <= 2 ? config.keepIfPerMillionShort : config.keepIfPerMillion
+        // Latin letters with full stops between them ("s.r.o", "e.g", "U.S.A")
+        // are abbreviations; the same keys are ю in Russian, so only a real
+        // Russian word ("c.lf" is "сюда") may take them over.
+        if current.isLatin && TextTools.isDottedAbbreviation(coreTyped) && !(sO.known && sO.perMillion >= config.keepIfPerMillion) {
+            return keep("dotted abbreviation")
+        }
         if typedWordLike && sT.known && sT.perMillion >= keepPM && delta < config.hugeMargin {
             return keep("typed is common")
         }
@@ -212,5 +230,57 @@ public final class Classifier: @unchecked Sendable {
         let sT = score(coreTyped, latin: current.isLatin)
         if TextTools.isPlainWord(coreTyped) && sT.known && sO.perMillion < sT.perMillion * config.contextRatio { return nil }
         return other
+    }
+
+    /// Decision for a word that is still being typed: returns the layout to
+    /// switch to only when the letters typed so far are clearly the other
+    /// language. Prefixes are rarely dictionary words, so only the n-gram
+    /// models are compared, with a much larger margin than for whole words,
+    /// and only on plain letters. Everything else waits for the end of the word.
+    public func decidePrefix(strokes: [KeyStroke], current: LayoutKind, latin: LayoutKind,
+                             remembered: Set<String> = []) -> LayoutKind? {
+        guard strokes.count >= config.prefixMinLetters else { return nil }
+        let alt: LayoutKind = current == .ru ? (latin.isLatin && layouts.has(latin) ? latin : .us) : .ru
+        let typed = layouts[current].translate(strokes)
+        let other = layouts[alt].translate(strokes)
+        guard typed.count == strokes.count, other.count == strokes.count, other.allSatisfy(\.isLetter) else { return nil }
+        // Inside an English word a comma, a semicolon or a bracket is never
+        // followed by a letter, while in the Russian layout these keys are
+        // б, ж, х and ъ. Such a key in the middle of the prefix is strong
+        // evidence; the full stop and the apostrophe are not (e.g., don't).
+        let chars = Array(typed)
+        var inner = 0
+        for (i, ch) in chars.enumerated() where !ch.isLetter {
+            // Not the last key (it may be sentence punctuation), and at the very
+            // start only the comma and the semicolon (б, ж): "[" opens links.
+            guard current.isLatin, Self.innerKeys.contains(ch), i < chars.count - 1,
+                  i > 0 || ch == "," || ch == ";" else { return nil }
+            inner += 1
+        }
+        guard chars.contains(where: \.isLetter) else { return nil }
+        if current.isLatin && (TextTools.isAllCaps(typed) || TextTools.isCamelCase(typed)) { return nil }
+        // A remembered word may start like this: wait for the whole word.
+        let low = typed.lowercased()
+        if remembered.contains(where: { $0.hasPrefix(low) }) { return nil }
+        // The typed letters already form a common word: it may end right here.
+        let sTw = score(typed, latin: current.isLatin)
+        if sTw.known && sTw.perMillion >= config.keepIfPerMillion { return nil }
+
+        func prefixScore(_ text: String, latin: Bool) -> (Double, Double) {
+            var best = -Double.infinity, worst = -Double.infinity
+            for m in models.models(latin: latin) {
+                let w = m.normalize(text)
+                best = max(best, log10(config.prior[m.language] ?? 0.1) + m.ngrams.logProb(w, end: false))
+                worst = max(worst, m.ngrams.worstStep(w, end: false))
+            }
+            return (best, worst)
+        }
+        let (sO, worstO) = prefixScore(other, latin: alt.isLatin)
+        if inner > 0 {
+            return strokes.count >= config.prefixMinLetters + 1 && worstO > config.prefixInnerPlausibleStep ? alt : nil
+        }
+        let (sT, worstT) = prefixScore(typed, latin: current.isLatin)
+        let need = config.prefixMargin + (current == .ru ? config.prefixMarginToLatinExtra : 0)
+        return sO - sT > need && worstT < config.prefixImplausibleStep ? alt : nil
     }
 }

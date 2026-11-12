@@ -41,6 +41,20 @@ final class KeyboardMonitor {
     var onLearned: ((String) -> Void)?
     var onLayoutSwitched: ((LayoutKind) -> Void)?
 
+    /// The word being typed was switched while typing: where the word and the
+    /// replaced region (with short words pulled along) start, and the layout it
+    /// was typed in.
+    private var midSwitch: (word: Int, region: Int, from: LayoutKind)?
+    /// Whether the focused field allows switching while typing, checked once
+    /// per word (search and address fields with inline completion do not).
+    private var prefixField: (start: Int, ok: Bool)?
+    private var lastField: (element: AXUIElement, ok: Bool)?
+    /// Right after a switch the application can still render a key or two in
+    /// the old layout; keys typed in this short window are typed by us.
+    private var forcedLayout: LayoutKind?
+    private var forcedUntil: CFAbsoluteTime = 0
+    private static let forcedWindow: CFAbsoluteTime = 0.12
+
     // Option gesture state.
     private var gestureActive = false
     private var gestureCancelled = false
@@ -92,6 +106,8 @@ final class KeyboardMonitor {
         items.removeAll()
         lockedFrom = nil
         lastAction = .none
+        midSwitch = nil
+        prefixField = nil
     }
 
     private var isEnabledHere: Bool {
@@ -139,6 +155,7 @@ final class KeyboardMonitor {
         if code == kVK_Delete {
             if !items.isEmpty { items.removeLast() }
             if let l = lockedFrom, l >= items.count { lockedFrom = nil }
+            if let m = midSwitch, m.word >= items.count { midSwitch = nil }
             return false
         }
         if Self.resetKeys.contains(code) { reset(); return false }
@@ -147,23 +164,163 @@ final class KeyboardMonitor {
 
         let stroke = KeyStroke(keyCode: keyCode, shift: flags.contains(.maskShift), capsLock: flags.contains(.maskAlphaShift))
         // A layout that plays no role (for example a third Latin one): stay out.
-        guard let layout = inputs.current else { reset(); return false }
+        guard let systemLayout = inputs.current else { reset(); return false }
         // The text is computed from the key and the layout, the way the
         // application does it; the string carried by the event can lag behind
         // the modifier state.
+        var layout = systemLayout
+        var forced = false
+        if let f = forcedLayout {
+            if CFAbsoluteTimeGetCurrent() < forcedUntil {
+                layout = f
+                forced = true
+            } else {
+                forcedLayout = nil
+            }
+        }
         var text = layouts[layout].character(for: stroke)
         if text.isEmpty && code == kVK_Space { text = " " }
 
         if code == kVK_Space || !layouts.isWordStroke(stroke) {
-            return finishWord(separator: stroke, separatorText: text, layout: layout, proxy: proxy)
+            if finishWord(separator: stroke, separatorText: text, layout: layout, proxy: proxy) { return true }
+            return forced ? typeForced(text, proxy: proxy) : false
         }
         items.append(TypedItem(stroke: stroke, text: text, isWord: true, layout: layout))
         if items.count > Self.maxItems {
             let drop = items.count - Self.maxItems / 2
             items.removeFirst(drop)
             if let l = lockedFrom { lockedFrom = l >= drop ? l - drop : nil }
+            midSwitch = nil
+            prefixField = nil
         }
-        return false
+        if switchWhileTyping(proxy: proxy) { return true }
+        return forced ? typeForced(text, proxy: proxy) : false
+    }
+
+    /// Types the key's character ourselves (see `forcedLayout`).
+    private func typeForced(_ text: String, proxy: CGEventTapProxy) -> Bool {
+        guard !text.isEmpty else { return false }
+        Typist.post(Typist.replacementEvents(deleting: 0, typing: text), proxy: proxy)
+        return true
+    }
+
+    private func startForcedWindow(_ kind: LayoutKind) {
+        forcedLayout = kind
+        forcedUntil = CFAbsoluteTimeGetCurrent() + Self.forcedWindow
+    }
+
+    /// Switching while typing: called after each letter, before the
+    /// application gets it. When the letters so far are clearly the other
+    /// language, the key is dropped and the whole prefix is retyped in the
+    /// right layout. Returns true when the key event must be dropped.
+    private func switchWhileTyping(proxy: CGEventTapProxy) -> Bool {
+        guard settings.autoSwitch, settings.switchWhileTyping, let r = currentWordRange() else { return false }
+        if midSwitch?.word == r.lowerBound { return false }
+        if let l = lockedFrom, r.lowerBound >= l { return false }
+        if prefixField?.start != r.lowerBound {
+            prefixField = (r.lowerBound, false)
+            let start = r.lowerBound
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.prefixField?.start == start else { return }
+                self.prefixField = (start, self.fieldAllowsSwitchWhileTyping())
+            }
+            return false
+        }
+        guard prefixField?.ok == true else { return false }
+        let word = Array(items[r])
+        let from = word[0].layout
+        guard word.allSatisfy({ $0.layout == from }),
+              let target = classifier.decidePrefix(strokes: word.map(\.stroke), current: from, latin: latinTarget,
+                                                   remembered: learned.matchSet) else { return false }
+        // The current key has not reached the application yet.
+        let onScreen = word.dropLast().map(\.text).joined().count
+        let pulled = pullShortWords(before: r.lowerBound, from: from, to: target)
+        let newWord = layouts[target].translate(word.map(\.stroke))
+        Typist.post(Typist.replacementEvents(deleting: pulled.deleteCount + onScreen, typing: pulled.text + newWord), proxy: proxy)
+        for i in r {
+            items[i].layout = target
+            items[i].text = layouts[target].character(for: items[i].stroke)
+            items[i].settled = true
+        }
+        midSwitch = (r.lowerBound, pulled.start, from)
+        DebugLog.write("while typing: '\(layouts[from].translate(word.map(\.stroke)))' -> '\(pulled.text + newWord)'")
+        switchLayout(to: target)
+        startForcedWindow(target)
+        if settings.sound { Sound.play() }
+        return true
+    }
+
+    /// Search fields, combo boxes and browser address bars complete the text
+    /// inline (the completion is selected), which breaks retyping mid-word.
+    private func fieldAllowsSwitchWhileTyping() -> Bool {
+        guard let el = Selection.focusedElement() else { return true }
+        if let last = lastField, CFEqual(last.element, el) { return last.ok }
+        func attr(_ e: AXUIElement, _ a: String) -> String? {
+            var v: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(e, a as CFString, &v) == .success else { return nil }
+            return v as? String
+        }
+        var ok = true
+        let role = attr(el, kAXRoleAttribute) ?? ""
+        let subrole = attr(el, kAXSubroleAttribute) ?? ""
+        let ident = (attr(el, "AXIdentifier") ?? "").uppercased()
+        if role == kAXComboBoxRole || subrole == kAXSearchFieldSubrole || ident.contains("ADDRESS") || ident.contains("SEARCH") {
+            ok = false
+        } else if let id = frontBundleID, Self.browsers.contains(id) {
+            // In a browser, a text field outside the web page is the address bar.
+            var inPage = false
+            var cur: AXUIElement? = el
+            for _ in 0..<40 {
+                guard let c = cur else { break }
+                if attr(c, kAXRoleAttribute) == "AXWebArea" { inPage = true; break }
+                var parent: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(c, kAXParentAttribute as CFString, &parent) == .success, let parent else { break }
+                cur = (parent as! AXUIElement)
+            }
+            ok = inPage
+        }
+        lastField = (el, ok)
+        return ok
+    }
+
+    private static let browsers: Set<String> = ["com.apple.Safari", "com.google.Chrome", "org.mozilla.firefox",
+                                                "company.thebrowser.Browser", "com.brave.Browser", "com.microsoft.edgemac",
+                                                "ru.yandex.desktop.yandex-browser", "com.operasoftware.Opera",
+                                                "com.vivaldi.Vivaldi", "app.zen-browser.zen"]
+
+    /// Short words left as typed right before a word that switches to `to`
+    /// go with it ("PROD d ,kb;fqibt" -> "PROD в ближайшие"). Converts them in
+    /// the history and returns where the replaced region starts, how many
+    /// characters before the word are to be deleted and the new text for them.
+    private func pullShortWords(before wordStart: Int, from: LayoutKind, to: LayoutKind) -> (start: Int, deleteCount: Int, text: String) {
+        var start = wordStart
+        var taken = 0
+        for prev in wordRanges().reversed() where prev.upperBound < wordStart {
+            guard taken < 2,
+                  items[prev.upperBound..<start].allSatisfy({ !$0.isWord && $0.text == " " }),
+                  items[prev].allSatisfy({ $0.layout == from && !$0.settled }),
+                  classifier.followsSwitch(strokes: items[prev].map(\.stroke),
+                                           typed: layouts[from].translate(items[prev].map(\.stroke)),
+                                           current: from, target: to, remembered: learned.matchSet) != nil
+            else { break }
+            taken += 1
+            start = prev.lowerBound
+        }
+        var deleteCount = 0
+        var text = ""
+        if start < wordStart {
+            for i in start..<wordStart {
+                deleteCount += items[i].text.count
+                if items[i].isWord {
+                    items[i].text = layouts[to].character(for: items[i].stroke)
+                    items[i].layout = to
+                    items[i].settled = true
+                }
+                text += items[i].text
+            }
+            DebugLog.write("context: '\(text)' follows the switched word")
+        }
+        return (start, deleteCount, text)
     }
 
     /// Trailing run of word keys (the word being typed).
@@ -192,10 +349,33 @@ final class KeyboardMonitor {
     /// to change, replaces word and separator. Returns true when the separator
     /// event must be dropped (it was re-typed by us).
     private func finishWord(separator: KeyStroke, separatorText: String, layout: LayoutKind, proxy: CGEventTapProxy) -> Bool {
-        defer { lockedFrom = nil }
+        defer { lockedFrom = nil; midSwitch = nil }
         guard let range = currentWordRange() else {
             items.append(TypedItem(stroke: separator, text: separatorText, isWord: false, layout: layout))
             return false
+        }
+        // A word switched while it was typed is decided already; Option right
+        // after the separator still undoes that switch.
+        if let m = midSwitch, m.word == range.lowerBound {
+            let strokes = items[range].map(\.stroke)
+            let shown = items[range].map(\.text).joined()
+            var sepText = separatorText
+            var suppressed = false
+            if settings.fixTwoCapitals, let f = TextTools.fixTwoCapitals(shown) {
+                Typist.post(Typist.replacementEvents(deleting: shown.count, typing: f + separatorText), proxy: proxy)
+                if range.count > 1 {
+                    let i = range.lowerBound + 1
+                    items[i].text = items[i].text.lowercased()
+                    items[i].stroke.shift = false
+                    items[i].stroke.capsLock = false
+                }
+                suppressed = true
+            } else if layout != items[range.lowerBound].layout {
+                sepText = layouts[items[range.lowerBound].layout].character(for: separator)
+            }
+            items.append(TypedItem(stroke: separator, text: sepText, isWord: false, layout: items[range.lowerBound].layout))
+            lastAction = .autoSwitch(original: TextTools.trimNonLetters(layouts[m.from].translate(strokes)), start: m.region)
+            return suppressed
         }
         let locked = lockedFrom.map { range.lowerBound >= $0 } ?? false
         let word = Array(items[range])
@@ -231,34 +411,13 @@ final class KeyboardMonitor {
         }
         // Short words left as typed right before a switched word go with it.
         var start = range.lowerBound
-        var contextWords: [Range<Int>] = []
-        if let target {
-            for prev in wordRanges().reversed() where prev.upperBound < range.lowerBound {
-                guard contextWords.count < 2,
-                      items[prev.upperBound..<start].allSatisfy({ !$0.isWord && $0.text == " " }),
-                      items[prev].allSatisfy({ $0.layout == wordLayout && !$0.settled }),
-                      classifier.followsSwitch(strokes: items[prev].map(\.stroke),
-                                               typed: layouts[wordLayout].translate(items[prev].map(\.stroke)),
-                                               current: wordLayout, target: target, remembered: learned.matchSet) != nil
-                else { break }
-                contextWords.append(prev)
-                start = prev.lowerBound
-            }
-        }
         var deleteCount = typedCount
         var prefix = ""
-        if start < range.lowerBound {
-            for i in start..<range.lowerBound {
-                deleteCount += items[i].text.count
-                if items[i].isWord, let t = target {
-                    let r = layouts[t].character(for: items[i].stroke)
-                    items[i].text = r
-                    items[i].layout = t
-                    items[i].settled = true
-                }
-                prefix += items[i].text
-            }
-            DebugLog.write("context: '\(prefix)' follows the switched word")
+        if let target {
+            let pulled = pullShortWords(before: range.lowerBound, from: wordLayout, to: target)
+            start = pulled.start
+            deleteCount += pulled.deleteCount
+            prefix = pulled.text
         }
         Typist.post(Typist.replacementEvents(deleting: deleteCount, typing: prefix + replacement + sepOut), proxy: proxy)
 
@@ -278,6 +437,7 @@ final class KeyboardMonitor {
         items.append(TypedItem(stroke: separator, text: sepOut, isWord: false, layout: newLayout))
         if let target {
             switchLayout(to: target)
+            startForcedWindow(target)
             lastAction = .autoSwitch(original: TextTools.trimNonLetters(typed), start: start)
             if settings.sound { Sound.play() }
         }
@@ -338,7 +498,12 @@ final class KeyboardMonitor {
     /// word each time. Without typed history works on the selection or on the
     /// word before the caret.
     private func convertLast(proxy: CGEventTapProxy) {
-        let previous = lastAction
+        var previous = lastAction
+        if case .none = previous, let m = midSwitch, let cw = currentWordRange(), cw.lowerBound == m.word {
+            let original = layouts[m.from].translate(items[cw].map(\.stroke))
+            previous = .autoSwitch(original: TextTools.trimNonLetters(original), start: m.region)
+            midSwitch = nil
+        }
         var count = 1
         var target: LayoutKind?
         if case .convert(let n, let t) = previous { count = n + 1; target = t }

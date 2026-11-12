@@ -76,6 +76,13 @@ enum Fixture {
 }
 
 @Suite struct ClassifierTests {
+    @Test func dottedRussianWordsStillSwitch() {
+        for w in ["сюда", "юрист", "люблю", "каюта"] {
+            let d = Fixture.decide(w, intended: .ru, typedIn: .us)
+            #expect(d.action == .switchTo(.ru), "\(w): \(d)")
+        }
+    }
+
     @Test(arguments: ["привет", "спасибо", "сейчас", "нормально", "кстати", "договорились", "объект", "Привет",
                       "не", "да", "ну", "мы", "компьютер", "клавиатура", "раскладка", "жёлтый"])
     func russianTypedInLatinSwitches(_ word: String) {
@@ -116,7 +123,8 @@ enum Fixture {
     @Test func specialStringsStay() {
         let c = Fixture.classifier
         let us = Fixture.layouts[.us]
-        for s in ["user@mail.sk", "www.google.com", "google.com", "/usr/bin", "abc123", "x2", "GA4"] {
+        for s in ["user@mail.sk", "www.google.com", "google.com", "/usr/bin", "abc123", "x2", "GA4",
+                  "s.r.o", "s.r.o.", "a.s.", "e.g.", "i.e.", "U.S.A.", "t.j.", "p.s."] {
             let strokes = us.strokes(for: s)!
             let d = c.decide(strokes: strokes, typed: s, current: .us, latin: .us)
             #expect(d.action == .keep, "\(s): \(d)")
@@ -163,6 +171,47 @@ enum Fixture {
         #expect(context("PROD", intended: .us, typedIn: .us, target: .ru) == nil)
         #expect(context("git", intended: .us, typedIn: .us, target: .ru) == nil)
         #expect(context("x2", intended: .us, typedIn: .us, target: .ru) == nil)
+    }
+
+    /// First prefix length at which the word switches while being typed.
+    func firesAt(_ word: String, intended: LayoutKind, typedIn: LayoutKind, latin: LayoutKind = .us,
+                 remembered: Set<String> = []) -> Int? {
+        let strokes = Fixture.layouts[intended].strokes(for: word)!
+        for k in 1...strokes.count {
+            if Fixture.classifier.decidePrefix(strokes: Array(strokes.prefix(k)), current: typedIn, latin: latin,
+                                               remembered: remembered) != nil { return k }
+        }
+        return nil
+    }
+
+    @Test(arguments: ["приветик", "спасибо", "нормально", "договорились", "клавиатура", "сегодня", "пожалуйста",
+                      "объявление", "можно", "будет", "быстро", "жизнь"])
+    func russianSwitchesWhileTyping(_ word: String) {
+        let k = firesAt(word, intended: .ru, typedIn: .us)
+        // Before the separator: at the latest on the last letter.
+        #expect(k != nil, "\(word)")
+    }
+
+    @Test(arguments: ["hello", "thanks", "github", "kubernetes", "dakujem", "zajtra", "USA", "iPhone", "localhost",
+                      "petdoctor", "Bratislava", "docker", "rezervovat", "objednavka"])
+    func latinWordsNeverSwitchWhileTyping(_ word: String) {
+        #expect(firesAt(word, intended: .us, typedIn: .us) == nil, "\(word)")
+    }
+
+    @Test(arguments: ["привет", "шипящее", "Шереметьево", "договорились", "компьютер"])
+    func russianWordsNeverSwitchWhileTyping(_ word: String) {
+        #expect(firesAt(word, intended: .ru, typedIn: .ru) == nil, "\(word)")
+    }
+
+    @Test(arguments: ["x,y", "name,email", "a;b", "foo[bar]", "arr[i]", "don't", "e.g.", "i.e.", "U.S.", "google.com",
+                      "file.txt", "it's", "rock'n'roll", "key;value", "list[0]", "[link]", ",next", ";)"])
+    func codeAndPunctuationNeverSwitchWhileTyping(_ text: String) {
+        #expect(firesAt(text, intended: .us, typedIn: .us) == nil, "\(text)")
+    }
+
+    @Test func rememberedWordsWaitForTheEnd() {
+        #expect(firesAt("спартамосква", intended: .ru, typedIn: .us) != nil)
+        #expect(firesAt("спартамосква", intended: .ru, typedIn: .us, remembered: ["cgfhnfvjcrdf", "cgfhnfrvjcrdf"]) == nil)
     }
 
     /// Accuracy on the word lists in Tests/data (the same lists keyswitcher-eval uses).

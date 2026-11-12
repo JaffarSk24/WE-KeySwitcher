@@ -28,3 +28,4 @@
 "The word exactly as it is typed, for example petdoctor." = "Слово в том виде, в каком его набирают, например petdoctor.";
 "Add" = "Добавить";
 "Cancel" = "Отмена";
+"Already while typing a word" = "Уже во время набора слова";

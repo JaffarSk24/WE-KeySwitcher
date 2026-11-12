@@ -89,45 +89,34 @@ if args.contains("--prefix") {
     for w in load("webster_en.txt") + load("names_en.txt") {
         cases += [C(word: w, intended: .us, typedIn: .us, latin: .us), C(word: w, intended: .us, typedIn: .ru, latin: .us)]
     }
-    print("margin minLetters implausible | keep cases: wrong mid-word switch | switch cases: switched early, avg letters saved, long words (6+) switched early")
-    for minLetters in [3, 4, 5] {
-        for margin in [3.0, 4.0, 5.0, 6.0] {
-            for implausible in [-2.5, -3.0, -3.5] {
-                var keepN = 0, keepBad = 0, swN = 0, swEarly = 0, saved = 0, longN = 0, longEarly = 0
-                var badSamples: [String] = []
-                for c in cases {
-                    guard let st = layouts[c.intended].strokes(for: c.word), c.word.filter(\.isLetter).count >= 2 else { continue }
-                    let shouldSwitch = c.intended.isLatin != c.typedIn.isLatin
-                    let alt: LayoutKind = c.typedIn == .ru ? c.latin : .ru
-                    var firedAt: Int? = nil
-                    if st.count > minLetters {
-                        for k in minLetters..<st.count {
-                            let pre = Array(st.prefix(k))
-                            let t = layouts[c.typedIn].translate(pre), o = layouts[alt].translate(pre)
-                            let (sT, wT) = lp(t, latin: c.typedIn.isLatin)
-                            let (sO, _) = lp(o, latin: alt.isLatin)
-                            guard sO > -99 else { break }
-                            let need = margin + (c.typedIn == .ru ? 1.0 : 0)
-                            if sO - sT > need && wT < implausible { firedAt = k; break }
-                        }
-                    }
-                    if shouldSwitch {
-                        swN += 1
-                        if let f = firedAt { swEarly += 1; saved += st.count - f }
-                        if st.count >= 6 { longN += 1; if firedAt != nil { longEarly += 1 } }
-                    } else {
-                        keepN += 1
-                        if let f = firedAt { keepBad += 1; if badSamples.count < 6 { badSamples.append("\(c.word)@\(f)") } }
-                    }
+    // Measures the rule the app uses (Classifier.decidePrefix).
+    var keepN = 0, keepBad = 0, swN = 0, swEarly = 0, saved = 0, longN = 0, longEarly = 0, wrongDir = 0, beforeLast = 0
+    var badSamples: [String] = []
+    for c in cases {
+        guard let st = layouts[c.intended].strokes(for: c.word), c.word.filter(\.isLetter).count >= 2 else { continue }
+        let shouldSwitch = c.intended.isLatin != c.typedIn.isLatin
+        var firedAt: Int? = nil
+        var firedTo: LayoutKind? = nil
+        if st.count > 1 {
+            for k in 1...st.count {
+                if let t = classifier.decidePrefix(strokes: Array(st.prefix(k)), current: c.typedIn, latin: c.latin) {
+                    firedAt = k; firedTo = t; break
                 }
-                print(String(format: "%.1f %d %.1f | %d of %d (%.2f%%) %@ | %.1f%% early, %.1f letters saved, long %.1f%%",
-                             margin, minLetters, implausible, keepBad, keepN, 100.0 * Double(keepBad) / Double(keepN),
-                             badSamples.joined(separator: ",") as NSString,
-                             100.0 * Double(swEarly) / Double(swN), Double(saved) / Double(max(swEarly, 1)),
-                             100.0 * Double(longEarly) / Double(max(longN, 1))))
             }
         }
+        if shouldSwitch {
+            swN += 1
+            if let f = firedAt { swEarly += 1; saved += st.count - f; if f < st.count { beforeLast += 1 }; if firedTo != (c.intended == .ru ? .ru : c.latin) { wrongDir += 1 } }
+            if st.count >= 6 { longN += 1; if firedAt != nil { longEarly += 1 } }
+        } else {
+            keepN += 1
+            if let f = firedAt { keepBad += 1; if badSamples.count < 20 { badSamples.append("\(c.word)@\(f)") } }
+        }
     }
+    print(String(format: "correct words switched mid-word: %d of %d (%.3f%%) %@", keepBad, keepN, 100.0 * Double(keepBad) / Double(keepN), badSamples.joined(separator: ", ") as NSString))
+    print(String(format: "wrong-layout words switched before the separator: %d of %d (%.1f%%), before the last letter: %.1f%%, %.1f letters earlier on average; words of 6+ letters: %.1f%%; wrong direction: %d",
+                 swEarly, swN, 100.0 * Double(swEarly) / Double(swN), 100.0 * Double(beforeLast) / Double(swN), Double(saved) / Double(max(swEarly, 1)),
+                 100.0 * Double(longEarly) / Double(max(longN, 1)), wrongDir))
     exit(0)
 }
 

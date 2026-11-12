@@ -9,6 +9,7 @@ final class Settings {
     private init() {
         d.register(defaults: [
             "autoSwitch": true,
+            "switchWhileTyping": true,
             "sound": true,
             "fixTwoCapitals": true,
             "excludedApps": ["com.microsoft.VSCode"],
@@ -19,6 +20,12 @@ final class Settings {
     var autoSwitch: Bool {
         get { d.bool(forKey: "autoSwitch") }
         set { d.set(newValue, forKey: "autoSwitch") }
+    }
+
+    /// Switch already while a word is typed when the first letters are clear.
+    var switchWhileTyping: Bool {
+        get { d.bool(forKey: "switchWhileTyping") }
+        set { d.set(newValue, forKey: "switchWhileTyping") }
     }
 
     var sound: Bool {
