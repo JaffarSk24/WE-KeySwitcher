@@ -141,8 +141,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item(L("Check for Updates…"), #selector(checkUpdates)))
         }
         menu.addItem(toggle(L("Check for updates automatically"), s.autoCheckUpdates, #selector(toggleAutoUpdates)))
-        menu.addItem(disabled(L("Option: convert the word or the selection")))
-        menu.addItem(disabled(L("Option+Shift: invert case")))
+        let ck = s.convertKey
+        let keyItem = NSMenuItem(title: String(format: L("Convert key: %@"), ck.title), action: nil, keyEquivalent: "")
+        let keyMenu = NSMenu()
+        for k in ConvertKey.allCases {
+            let it = item(k.title, #selector(chooseConvertKey(_:)))
+            it.representedObject = k.rawValue
+            it.state = k == ck ? .on : .off
+            keyMenu.addItem(it)
+        }
+        keyItem.submenu = keyMenu
+        menu.addItem(keyItem)
+        let keyName = ck.shortName.prefix(1).uppercased() + ck.shortName.dropFirst()
+        menu.addItem(disabled(String(format: L("%@: convert the word or the selection"), keyName)))
+        menu.addItem(disabled(String(format: L("%@+Shift: invert case"), keyName)))
         menu.addItem(.separator())
         menu.addItem(disabled("WE KeySwitcher " + Updater.currentVersion))
         menu.addItem(item(L("Quit"), #selector(quit)))
@@ -172,6 +184,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleAuto() { Settings.shared.autoSwitch.toggle() }
+    @objc private func chooseConvertKey(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let k = ConvertKey(rawValue: raw) else { return }
+        Settings.shared.convertKey = k
+    }
+
     @objc private func checkUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
     @objc private func toggleAutoUpdates() {
         Settings.shared.autoCheckUpdates.toggle()
@@ -249,7 +266,7 @@ final class WordsWindowController: NSObject, NSTableViewDataSource, NSTableViewD
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 300, height: 300)
 
-        let info = NSTextField(wrappingLabelWithString: L("These words are never switched automatically. A word gets here after you undo its automatic switch three times (Option right after the switch)."))
+        let info = NSTextField(wrappingLabelWithString: String(format: L("These words are never switched automatically. A word gets here after you undo its automatic switch three times (%@ right after the switch)."), Settings.shared.convertKey.shortName))
         info.font = .systemFont(ofSize: 11)
         info.textColor = .secondaryLabelColor
 

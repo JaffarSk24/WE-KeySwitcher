@@ -71,6 +71,9 @@ func modifierTap(_ codes: [UInt16], _ flags: [CGEventFlags]) {
 
 func option() { modifierTap([UInt16(kVK_Option)], [.maskAlternate]) }
 func optionShift() { modifierTap([UInt16(kVK_Option), UInt16(kVK_Shift)], [.maskAlternate, .maskShift]) }
+func control() { modifierTap([UInt16(kVK_Control)], [.maskControl]) }
+func controlShift() { modifierTap([UInt16(kVK_Control), UInt16(kVK_Shift)], [.maskControl, .maskShift]) }
+func rightOption() { modifierTap([UInt16(kVK_RightOption)], [.maskAlternate]) }
 
 /// Types `text` with the keys it has in layout `intended`, whatever layout is on.
 func shiftState(_ down: Bool) {
@@ -184,6 +187,30 @@ check("Option on word", "слово", layout: .ru)
 type(" ", as: .ru)
 check("no auto switch after manual", "слово ", layout: .ru)
 clear()
+setAuto(true)
+
+// 7b. Another convert key chosen in the menu: Control.
+let keyPrefs = UserDefaults(suiteName: "sk.whiteeagles.keyswitcher")!
+func setConvertKey(_ k: String) { keyPrefs.set(k, forKey: "convertKey"); keyPrefs.synchronize(); pause(1200) }
+setAuto(false)
+setConvertKey("control")
+select(.us); type("слово", as: .ru)
+option()
+check("Control chosen: Option does nothing", "ckjdj", layout: .us)
+control()
+check("Control chosen: Control converts", "слово", layout: .ru)
+controlShift()
+check("Control chosen: Control+Shift inverts case", "СЛОВО", layout: .ru)
+clear()
+// Right Option only: the left one does nothing.
+setConvertKey("rightOption")
+select(.us); type("слово", as: .ru)
+option()
+check("Right Option chosen: left Option does nothing", "ckjdj", layout: .us)
+rightOption()
+check("Right Option chosen: right Option converts", "слово", layout: .ru)
+clear()
+setConvertKey("option")
 setAuto(true)
 
 // 8. Option right after an automatic switch undoes it.

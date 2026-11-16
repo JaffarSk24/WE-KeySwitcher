@@ -15,11 +15,8 @@
 "Add “%@”" = "Добавить «%@»";
 "Choose an app…" = "Выбрать приложение…";
 "Open at login" = "Запускать при входе";
-"Option: convert the word or the selection" = "Option: перевести слово или выделение";
-"Option+Shift: invert case" = "Option+Shift: сменить регистр";
 "Quit" = "Выйти";
 "Remembered words" = "Запомненные слова";
-"These words are never switched automatically. A word gets here after you undo its automatic switch three times (Option right after the switch)." = "Эти слова никогда не переключаются сами. Слово попадает сюда после трёх ручных отмен автопереключения (Option сразу после замены).";
 "Search" = "Поиск";
 "Word" = "Слово";
 "Add…" = "Добавить…";
@@ -47,3 +44,11 @@
 "The download was incomplete." = "Загрузка не завершилась.";
 "The downloaded archive does not contain the expected app." = "В скачанном архиве нет ожидаемого приложения.";
 "The new app is not signed like this one." = "Новая версия подписана не так, как установленная.";
+"Convert key: %@" = "Клавиша перевода: %@";
+"%@: convert the word or the selection" = "%@: перевести слово или выделение";
+"%@+Shift: invert case" = "%@+Shift: сменить регистр";
+"These words are never switched automatically. A word gets here after you undo its automatic switch three times (%@ right after the switch)." = "Эти слова никогда не переключаются сами. Слово попадает сюда после трёх ручных отмен автопереключения (%@ сразу после замены).";
+"Right Option ⌥" = "Правый Option ⌥";
+"Right Command ⌘" = "Правый Command ⌘";
+"Right Option" = "правый Option";
+"Right Command" = "правый Command";

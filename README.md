@@ -13,6 +13,7 @@ It is made for Macs with Apple M-series chips only (there is no Intel build), is
 - **Short words follow the next word.** One- and two-letter words are too ambiguous to switch on their own (`z` is the Russian `я` and also a Slovak word), so they wait for the next word. When it switches, a short word right before it goes along if it is a common word in the new language: `PROD d ,kb;fqibt` becomes `PROD в ближайшие`, while the English `a` in `a ghbdtn` stays.
 - **Single Option converts by hand.** Press and release Option (without other keys in between) and the last word is converted to the other layout. Press it again right away and one more word before it is taken, then another, and so on. With text selected, Option converts the selection. After a click somewhere in a text, Option converts the word right before the caret.
 - **Undo and learning.** Option right after an automatic switch puts the word back as typed. This works in the middle of a word too: if a word (a name, a password in a plain field) switches while you type it, press Option and keep typing; the rest of the word stays in the layout you chose and is not switched again. When you undo the switch of the same word three times, the word is remembered and is never switched again. The list of remembered words can be searched and edited from the menu.
+- **Choose the key.** Option is the default; the menu item Convert key switches it to Control, the right Option only or the right Command. Everything said here about Option then applies to that key, and case inversion becomes that key with Shift.
 - **Option+Shift inverts case** of the last word or of the selection: `пРИВЕТ` becomes `Привет`.
 - **TWo capitals fixed.** `ПРивет` and `HEllo` become `Привет` and `Hello` at the end of the word.
 - **Menus are left alone.** Option pressed while any menu is open (a Finder context menu, the menu bar, a pop-up) is ignored, so alternate menu items such as Finder's "Copy as Pathname" keep working.
@@ -66,12 +67,12 @@ Most of the remaining misses are rare words that are rare in both readings, and 
 | Action | Result |
 |---|---|
 | Type a word in the wrong layout | Switched while typing once the letters are clear, otherwise at the space |
-| Option (press and release) | Converts the last word; again: one more word |
+| Option (press and release; another key can be chosen in the menu) | Converts the last word; again: one more word |
 | Option right after an automatic switch | Undoes it (three undos of a word remember it) |
 | Select text, Option | Converts the selection and switches the layout |
 | Option+Shift | Inverts case of the last word or of the selection |
 
-The menu bar menu has the switches for automatic switching (and for switching already while typing), the sound and the two capitals fix, the list of remembered words, the excluded apps (add the app you were in, or choose any app), Open at login, Check for Updates and the automatic update check.
+The menu bar menu has the convert key (Option, Control, right Option or right Command), the switches for automatic switching (and for switching already while typing), the sound and the two capitals fix, the list of remembered words, the excluded apps (add the app you were in, or choose any app), Open at login, Check for Updates and the automatic update check.
 
 ## Data and settings
 

@@ -15,11 +15,8 @@
 "Add “%@”" = "Add “%@”";
 "Choose an app…" = "Choose an app…";
 "Open at login" = "Open at login";
-"Option: convert the word or the selection" = "Option: convert the word or the selection";
-"Option+Shift: invert case" = "Option+Shift: invert case";
 "Quit" = "Quit";
 "Remembered words" = "Remembered words";
-"These words are never switched automatically. A word gets here after you undo its automatic switch three times (Option right after the switch)." = "These words are never switched automatically. A word gets here after you undo its automatic switch three times (Option right after the switch).";
 "Search" = "Search";
 "Word" = "Word";
 "Add…" = "Add…";
@@ -47,3 +44,11 @@
 "The download was incomplete." = "The download was incomplete.";
 "The downloaded archive does not contain the expected app." = "The downloaded archive does not contain the expected app.";
 "The new app is not signed like this one." = "The new app is not signed like this one.";
+"Convert key: %@" = "Convert key: %@";
+"%@: convert the word or the selection" = "%@: convert the word or the selection";
+"%@+Shift: invert case" = "%@+Shift: invert case";
+"These words are never switched automatically. A word gets here after you undo its automatic switch three times (%@ right after the switch)." = "These words are never switched automatically. A word gets here after you undo its automatic switch three times (%@ right after the switch).";
+"Right Option ⌥" = "Right Option ⌥";
+"Right Command ⌘" = "Right Command ⌘";
+"Right Option" = "Right Option";
+"Right Command" = "Right Command";

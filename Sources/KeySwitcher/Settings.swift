@@ -1,5 +1,59 @@
 import AppKit
+import Carbon
 import KeySwitcherCore
+
+/// The modifier key whose single press (press and release, nothing else in
+/// between) converts the last word or the selection.
+enum ConvertKey: String, CaseIterable {
+    case option, rightOption, control, rightCommand
+
+    /// Key codes that start the gesture.
+    var keyCodes: Set<Int> {
+        switch self {
+        case .option: return [kVK_Option, kVK_RightOption]
+        case .rightOption: return [kVK_RightOption]
+        case .control: return [kVK_Control, kVK_RightControl]
+        case .rightCommand: return [kVK_RightCommand]
+        }
+    }
+
+    /// Key codes of the same modifier that must not be used instead.
+    var otherSideCodes: Set<Int> {
+        switch self {
+        case .rightOption: return [kVK_Option]
+        case .rightCommand: return [kVK_Command]
+        default: return []
+        }
+    }
+
+    var flag: CGEventFlags {
+        switch self {
+        case .option, .rightOption: return .maskAlternate
+        case .control: return .maskControl
+        case .rightCommand: return .maskCommand
+        }
+    }
+
+    /// Name shown in the menu.
+    var title: String {
+        switch self {
+        case .option: return "Option ⌥"
+        case .rightOption: return L("Right Option ⌥")
+        case .control: return "Control ⌃"
+        case .rightCommand: return L("Right Command ⌘")
+        }
+    }
+
+    /// Short name for hints such as "Control+Shift".
+    var shortName: String {
+        switch self {
+        case .option: return "Option"
+        case .rightOption: return L("Right Option")
+        case .control: return "Control"
+        case .rightCommand: return L("Right Command")
+        }
+    }
+}
 
 /// User settings kept in UserDefaults (sk.whiteeagles.keyswitcher).
 final class Settings {
@@ -11,6 +65,7 @@ final class Settings {
             "autoSwitch": true,
             "switchWhileTyping": true,
             "autoCheckUpdates": true,
+            "convertKey": ConvertKey.option.rawValue,
             "sound": true,
             "fixTwoCapitals": true,
             "excludedApps": ["com.microsoft.VSCode"],
@@ -27,6 +82,11 @@ final class Settings {
     var switchWhileTyping: Bool {
         get { d.bool(forKey: "switchWhileTyping") }
         set { d.set(newValue, forKey: "switchWhileTyping") }
+    }
+
+    var convertKey: ConvertKey {
+        get { ConvertKey(rawValue: d.string(forKey: "convertKey") ?? "") ?? .option }
+        set { d.set(newValue.rawValue, forKey: "convertKey") }
     }
 
     /// Daily check of GitHub Releases for a new version.

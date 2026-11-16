@@ -15,11 +15,8 @@
 "Add “%@”" = "Pridať „%@“";
 "Choose an app…" = "Vybrať aplikáciu…";
 "Open at login" = "Otvoriť po prihlásení";
-"Option: convert the word or the selection" = "Option: previesť slovo alebo výber";
-"Option+Shift: invert case" = "Option+Shift: zmeniť veľkosť písmen";
 "Quit" = "Ukončiť";
 "Remembered words" = "Zapamätané slová";
-"These words are never switched automatically. A word gets here after you undo its automatic switch three times (Option right after the switch)." = "Tieto slová sa nikdy neprepínajú automaticky. Slovo sa sem dostane, keď trikrát zrušíte jeho automatické prepnutie (Option hneď po prepnutí).";
 "Search" = "Hľadať";
 "Word" = "Slovo";
 "Add…" = "Pridať…";
@@ -47,3 +44,11 @@
 "The download was incomplete." = "Sťahovanie sa nedokončilo.";
 "The downloaded archive does not contain the expected app." = "Stiahnutý archív neobsahuje očakávanú aplikáciu.";
 "The new app is not signed like this one." = "Nová verzia nie je podpísaná ako táto.";
+"Convert key: %@" = "Kláves prevodu: %@";
+"%@: convert the word or the selection" = "%@: previesť slovo alebo výber";
+"%@+Shift: invert case" = "%@+Shift: zmeniť veľkosť písmen";
+"These words are never switched automatically. A word gets here after you undo its automatic switch three times (%@ right after the switch)." = "Tieto slová sa nikdy neprepínajú automaticky. Slovo sa sem dostane, keď trikrát zrušíte jeho automatické prepnutie (%@ hneď po prepnutí).";
+"Right Option ⌥" = "Pravý Option ⌥";
+"Right Command ⌘" = "Pravý Command ⌘";
+"Right Option" = "pravý Option";
+"Right Command" = "pravý Command";

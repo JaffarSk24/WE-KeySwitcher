@@ -456,18 +456,19 @@ final class KeyboardMonitor {
         onLayoutSwitched?(kind)
     }
 
-    // MARK: Option gestures
+    // MARK: convert-key gestures (Option by default, see ConvertKey)
 
     private func handleFlags(_ event: CGEvent, proxy: CGEventTapProxy) {
         let code = Int(event.getIntegerValueField(.keyboardEventKeycode))
         let f = event.flags
-        let option = f.contains(.maskAlternate)
+        let key = settings.convertKey
+        let trigger = f.contains(key.flag)
         let shift = f.contains(.maskShift)
-        let others = !f.intersection([.maskCommand, .maskControl, .maskSecondaryFn]).isEmpty
-        let isOptionKey = code == kVK_Option || code == kVK_RightOption
+        let otherFlags = CGEventFlags([.maskCommand, .maskControl, .maskAlternate, .maskSecondaryFn]).subtracting(key.flag)
+        let others = !f.intersection(otherFlags).isEmpty
 
         if !gestureActive {
-            if isOptionKey && option && !others {
+            if key.keyCodes.contains(code) && trigger && !others {
                 gestureActive = true
                 gestureCancelled = !isEnabledHere
                 gestureShift = shift
@@ -475,9 +476,11 @@ final class KeyboardMonitor {
             }
             return
         }
-        if others { gestureCancelled = true }
+        // The same modifier on the wrong side (left Option when only the right
+        // one is the key) or any other modifier: not our gesture.
+        if others || key.otherSideCodes.contains(code) { gestureCancelled = true }
         if shift { gestureShift = true }
-        if !option && !shift && !others {
+        if !trigger && !shift && !others {
             gestureActive = false
             let quick = CFAbsoluteTimeGetCurrent() - gestureStart < 0.6
             guard !gestureCancelled, quick, NSEvent.pressedMouseButtons == 0, !Self.isMenuOpen() else { return }
